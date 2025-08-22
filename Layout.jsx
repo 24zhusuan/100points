@@ -78,7 +78,25 @@ export default function Layout({ children }) {
                 </SidebarMenu>
               </SidebarGroupContent>
             </SidebarGroup>
-            {/* ... (rest of the file is the same) ... */}
+            <SidebarGroup>
+              <SidebarGroupLabel className="text-xs font-medium text-slate-400 uppercase tracking-wider px-2 py-2">
+                Quick Stats
+              </SidebarGroupLabel>
+              <SidebarGroupContent>
+                <div className="px-3 py-2 space-y-3">
+                  <div className="flex items-center gap-3 text-sm">
+                    <Users className="w-4 h-4 text-cyan-400" />
+                    <span className="text-slate-300">Active Rooms</span>
+                    <span className="ml-auto font-bold text-cyan-400">Live</span>
+                  </div>
+                  <div className="flex items-center gap-3 text-sm">
+                    <Trophy className="w-4 h-4 text-yellow-400" />
+                    <span className="text-slate-300">Your Rank</span>
+                    <span className="ml-auto font-bold text-yellow-400">#1</span>
+                  </div>
+                </div>
+              </SidebarGroupContent>
+            </SidebarGroup>
           </SidebarContent>
 
           <SidebarFooter className="border-t border-slate-700 p-4 bg-slate-900">
@@ -99,6 +117,7 @@ export default function Layout({ children }) {
               </SignInButton>
             </SignedOut>
           </SidebarFooter>
+
         </Sidebar>
         <main className="flex-1 flex flex-col bg-slate-900">
           <header className="bg-slate-800/50 border-b border-slate-700 px-6 py-4 md:hidden">
