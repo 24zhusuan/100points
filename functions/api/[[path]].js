@@ -2,21 +2,22 @@ import { createClerkClient } from "@clerk/backend";
 
 // CORS 预检请求的响应头
 const corsHeaders = {
-  'Access-Control-Allow-Origin': '*', // 在生产环境中您可能希望限制为您的实际域名
+  'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
   'Access-Control-Allow-Headers': 'Content-Type, Authorization',
 };
 
-// 您的完整游戏逻辑
+// 您的完整游戏逻辑 (这部分保持不变)
 async function handleApiRequest(request, env, auth) {
     const { pathname } = new URL(request.url);
-    const { userId, user } = auth; // 从安全的 auth 对象中获取用户信息
+    const { userId, user } = auth; 
 
     const responseHeaders = {
         ...corsHeaders,
         'Content-Type': 'application/json'
     };
-
+    
+    // ... (您原有的所有 if (pathname === ...) 逻辑都保持原样)
     // 获取活跃的、等待中的房间列表
     if (pathname === '/api/rooms' && request.method === 'GET') {
         const { results } = await env.DB.prepare(
@@ -144,41 +145,47 @@ async function handleApiRequest(request, env, auth) {
         const finalRoomState = await env.DB.prepare('SELECT * FROM GameRooms WHERE id = ?').bind(id).first();
         return new Response(JSON.stringify(finalRoomState), { headers: responseHeaders });
     }
-
+    
     // 如果没有匹配的路由
     return new Response(JSON.stringify({ error: 'Not Found' }), { status: 404, headers: responseHeaders });
 }
 
-// ==========[ 修改部分开始 ]==========
-// Cloudflare Pages 的新入口点
+
+// Cloudflare Pages 的新入口点 (已修改为新的验证方式)
 export const onRequest = async ({ request, env }) => {
     if (request.method === 'OPTIONS') {
         return new Response(null, { headers: corsHeaders });
     }
-
-    if (!env.CLERK_SECRET_KEY || !env.VITE_CLERK_PUBLISHABLE_KEY) {
-        return new Response(JSON.stringify({ error: "Server configuration error: Clerk keys are not set." }), { status: 500, headers: corsHeaders });
-    }
     
     const clerkClient = createClerkClient({ secretKey: env.CLERK_SECRET_KEY });
-    
-    try {
-        const auth = await clerkClient.authenticateRequest({
-            request,
-            secretKey: env.CLERK_SECRET_KEY,
-            publishableKey: env.VITE_CLERK_PUBLISHABLE_KEY,
-        });
+    const authorizationHeader = request.headers.get('Authorization');
 
-        if (!auth.isAuthenticated) {
-            return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: corsHeaders });
+    if (!authorizationHeader) {
+        return new Response(JSON.stringify({ error: 'Authorization header is missing' }), { status: 401, headers: corsHeaders });
+    }
+
+    const token = authorizationHeader.replace('Bearer ', '');
+
+    try {
+        const claims = await clerkClient.verifyToken(token);
+        if (!claims.sub) {
+            return new Response(JSON.stringify({ error: 'Invalid token claims' }), { status: 401, headers: corsHeaders });
         }
         
-        // 将请求传递给您的游戏逻辑API
+        const user = await clerkClient.users.getUser(claims.sub);
+        if (!user) {
+            return new Response(JSON.stringify({ error: 'User not found' }), { status: 404, headers: corsHeaders });
+        }
+
+        const auth = {
+            isAuthenticated: true,
+            userId: user.id,
+            user: user,
+        };
+        
         return await handleApiRequest(request, env, auth);
 
     } catch (e) {
-        console.error("Authentication error:", e);
         return new Response(JSON.stringify({ error: "Authentication failed: " + e.message }), { status: 401, headers: corsHeaders });
     }
 };
-// ==========[ 修改部分结束 ]==========
