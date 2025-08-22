@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { Plus, Users, Gamepad2, Search, Trophy } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import { createPageUrl } from "@/utils";
+import { createPageUrl } from "@/lib/utils"; // 修正路径
 import { motion, AnimatePresence } from "framer-motion";
 import { useUser, SignInButton, SignedIn, SignedOut } from "@clerk/clerk-react";
 
@@ -20,7 +20,6 @@ export default function Dashboard() {
   const [rounds, setRounds] = useState("3");
   const [joinCode, setJoinCode] = useState("");
   const [isLoading, setIsLoading] = useState(true);
-
   const loadRooms = useCallback(async () => {
     try {
       const response = await fetch('/api/rooms'); // 使用相对路径
@@ -267,4 +266,5 @@ export default function Dashboard() {
       </SignedIn>
     </>
   );
+
 }
