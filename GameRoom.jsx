@@ -3,13 +3,12 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Trophy, ArrowLeft, Info, Swords } from "lucide-react";
+import { Trophy, ArrowLeft, Swords } from "lucide-react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { createPageUrl } from "@/utils";
+import { createPageUrl } from "@/lib/utils"; // 修正路径
 import { motion } from "framer-motion";
 import { useUser } from "@clerk/clerk-react";
 
-// 新增一个组件用于显示回合历史记录
 const RoundHistory = ({ room, me, opponent }) => {
     if (room.current_round <= 1) return null;
 
@@ -96,7 +95,6 @@ export default function GameRoom() {
     setError(null);
     const number = parseInt(playerNumber, 10);
 
-    // --- 前端验证 ---
     if (!room || !user || isNaN(number) || number < 0 || number > 100) {
         setError("Please enter a valid number between 0 and 100.");
         return;
@@ -105,7 +103,6 @@ export default function GameRoom() {
         setError(`You only have ${remainingPoints} points remaining.`);
         return;
     }
-    // --- 验证结束 ---
     
     try {
         const response = await fetch(`/api/room/${room.id}/submit`, {
@@ -156,7 +153,7 @@ export default function GameRoom() {
         const p2_submitted = room.player2_id && room.player2_numbers.length >= room.current_round;
         if (p1_submitted && p2_submitted) {
             setGamePhase("round_complete");
-            const timer = setTimeout(() => processRound(room), 2500); // 延长结算等待时间
+            const timer = setTimeout(() => processRound(room), 2500);
             return () => clearTimeout(timer);
         } else {
             setGamePhase("playing");
