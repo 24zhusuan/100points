@@ -7,13 +7,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { Plus, Users, Gamepad2, Search, Trophy } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import { createPageUrl } from "@/lib/utils"; // 修正路径
+import { createPageUrl } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
-import { useUser, SignInButton, SignedIn, SignedOut } from "@clerk/clerk-react";
+import { useUser, SignInButton, SignedIn, SignedOut, useAuth } from "@clerk/clerk-react"; // 1. 导入 useAuth
 
 export default function Dashboard() {
   const navigate = useNavigate();
   const { user, isLoaded } = useUser();
+  const { getToken } = useAuth(); // 2. 获取 getToken 函数
   const [rooms, setRooms] = useState([]);
   const [showCreateRoom, setShowCreateRoom] = useState(false);
   const [roomName, setRoomName] = useState("");
@@ -23,14 +24,18 @@ export default function Dashboard() {
 
   const loadRooms = useCallback(async () => {
     try {
-      const response = await fetch('/api/rooms');
+      // 3. 手动添加 Authorization header
+      const token = await getToken();
+      const response = await fetch('/api/rooms', {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
       if (!response.ok) throw new Error("Failed to load rooms");
       const activeRooms = await response.json();
       setRooms(activeRooms);
     } catch (error) {
       console.error("Failed to load rooms:", error);
     }
-  }, []);
+  }, [getToken]);
 
   useEffect(() => {
     if (isLoaded) {
@@ -44,16 +49,18 @@ export default function Dashboard() {
   const createRoom = async () => {
     if (!roomName.trim() || !user) return;
     try {
+      const token = await getToken(); // 3. 手动添加 Authorization header
       const roomCode = Math.random().toString(36).substring(2, 8).toUpperCase();
       const response = await fetch('/api/rooms', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}` 
+        },
         body: JSON.stringify({
           room_name: roomName,
           room_code: roomCode,
-          rounds: parseInt(rounds),
-          player1_id: user.id,
-          player1_full_name: user.fullName
+          rounds: parseInt(rounds)
         }),
       });
       if (!response.ok) throw new Error('Failed to create room');
@@ -71,12 +78,15 @@ export default function Dashboard() {
         return;
     }
     try {
+        const token = await getToken(); // 3. 手动添加 Authorization header
         const response = await fetch('/api/join-by-code', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}` 
+            },
             body: JSON.stringify({
-                room_code: room.room_code,
-                user: { id: user.id, full_name: user.fullName }
+                room_code: room.room_code
             }),
         });
         if (!response.ok) throw new Error('Failed to join room');
@@ -90,12 +100,15 @@ export default function Dashboard() {
   const joinByCode = async () => {
     if (!joinCode.trim() || !user) return;
     try {
+      const token = await getToken(); // 3. 手动添加 Authorization header
       const response = await fetch('/api/join-by-code', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}` 
+        },
         body: JSON.stringify({
           room_code: joinCode,
-          user: { id: user.id, full_name: user.fullName }
         }),
       });
       if (!response.ok) {
@@ -110,6 +123,7 @@ export default function Dashboard() {
     }
   };
 
+  // ... (剩余的 return 部分代码保持不变)
   if (!isLoaded || isLoading) {
     return (
         <div className="min-h-screen flex items-center justify-center bg-slate-900 p-6">
