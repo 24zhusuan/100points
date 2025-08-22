@@ -1,0 +1,10 @@
+{
+  "compilerOptions": {
+    "baseUrl": ".",       // 根目录
+    "paths": {
+      "@/*": ["*"]        // 支持绝对导入
+    },
+    "jsx": "react-jsx"    // 支持 JSX
+  },
+  "include": ["*.js", "*.jsx", "components/**/*"]
+}
