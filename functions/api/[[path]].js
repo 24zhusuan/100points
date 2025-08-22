@@ -149,26 +149,36 @@ async function handleApiRequest(request, env, auth) {
     return new Response(JSON.stringify({ error: 'Not Found' }), { status: 404, headers: responseHeaders });
 }
 
+// ==========[ 修改部分开始 ]==========
 // Cloudflare Pages 的新入口点
 export const onRequest = async ({ request, env }) => {
     if (request.method === 'OPTIONS') {
         return new Response(null, { headers: corsHeaders });
     }
 
-    if (!env.CLERK_SECRET_KEY) {
-        return new Response(JSON.stringify({ error: "Server configuration error: CLERK_SECRET_KEY is not set." }), { status: 500, headers: corsHeaders });
+    if (!env.CLERK_SECRET_KEY || !env.VITE_CLERK_PUBLISHABLE_KEY) {
+        return new Response(JSON.stringify({ error: "Server configuration error: Clerk keys are not set." }), { status: 500, headers: corsHeaders });
     }
+    
     const clerkClient = createClerkClient({ secretKey: env.CLERK_SECRET_KEY });
     
-    const auth = await clerkClient.authenticateRequest({ request });
-    if (!auth.isAuthenticated) {
-        return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: corsHeaders });
-    }
-
     try {
+        const auth = await clerkClient.authenticateRequest({
+            request,
+            secretKey: env.CLERK_SECRET_KEY,
+            publishableKey: env.VITE_CLERK_PUBLISHABLE_KEY,
+        });
+
+        if (!auth.isAuthenticated) {
+            return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: corsHeaders });
+        }
+        
         // 将请求传递给您的游戏逻辑API
         return await handleApiRequest(request, env, auth);
+
     } catch (e) {
-        return new Response(JSON.stringify({ error: e.message }), { status: 500, headers: corsHeaders });
+        console.error("Authentication error:", e);
+        return new Response(JSON.stringify({ error: "Authentication failed: " + e.message }), { status: 401, headers: corsHeaders });
     }
 };
+// ==========[ 修改部分结束 ]==========
