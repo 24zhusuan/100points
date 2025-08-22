@@ -20,9 +20,10 @@ export default function Dashboard() {
   const [rounds, setRounds] = useState("3");
   const [joinCode, setJoinCode] = useState("");
   const [isLoading, setIsLoading] = useState(true);
+
   const loadRooms = useCallback(async () => {
     try {
-      const response = await fetch('/api/rooms'); // 使用相对路径
+      const response = await fetch('/api/rooms');
       if (!response.ok) throw new Error("Failed to load rooms");
       const activeRooms = await response.json();
       setRooms(activeRooms);
@@ -44,7 +45,7 @@ export default function Dashboard() {
     if (!roomName.trim() || !user) return;
     try {
       const roomCode = Math.random().toString(36).substring(2, 8).toUpperCase();
-      const response = await fetch('/api/rooms', { // 使用相对路径
+      const response = await fetch('/api/rooms', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -70,7 +71,7 @@ export default function Dashboard() {
         return;
     }
     try {
-        const response = await fetch('/api/join-by-code', { // 使用相对路径
+        const response = await fetch('/api/join-by-code', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -89,7 +90,7 @@ export default function Dashboard() {
   const joinByCode = async () => {
     if (!joinCode.trim() || !user) return;
     try {
-      const response = await fetch('/api/join-by-code', { // 使用相对路径
+      const response = await fetch('/api/join-by-code', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -256,7 +257,6 @@ export default function Dashboard() {
                         </CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-3 text-sm text-slate-300">
-                        {/* Rules content */}
                     </CardContent>
                 </Card>
               </div>
@@ -266,5 +266,4 @@ export default function Dashboard() {
       </SignedIn>
     </>
   );
-
 }
