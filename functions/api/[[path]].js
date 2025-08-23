@@ -162,24 +162,20 @@ export const onRequest = async ({ request, env }) => {
     const clerkClient = createClerkClient({ secretKey: env.CLERK_SECRET_KEY });
     
     try {
-        // highlight-start
-        // 创建一个新的、标准的 Request 对象，以避免 Cloudflare 运行时的潜在不兼容问题
         const standardRequest = new Request(request.url, request);
 
         const auth = await clerkClient.authenticateRequest({
-            request: standardRequest, // 使用这个新的、标准化的请求对象
+            request: standardRequest,
             secretKey: env.CLERK_SECRET_KEY,
             publishableKey: env.VITE_CLERK_PUBLISHABLE_KEY,
-            domain: "100points.zhusuan.dpdns.org",
+            domain: "100points.zhusuan.dpdns.org", // 明确告知后端这是哪个卫星应用
             isSatellite: true,
         });
-        // highlight-end
 
         if (!auth.isAuthenticated) {
             return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: corsHeaders });
         }
         
-        // 注意：将原始的 request 对象传递给业务逻辑函数
         return await handleApiRequest(request, env, auth);
 
     } catch (e) {
