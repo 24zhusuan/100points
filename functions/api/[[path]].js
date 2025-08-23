@@ -17,7 +17,6 @@ async function handleApiRequest(request, env, auth) {
         'Content-Type': 'application/json'
     };
     
-    // ... (您原有的所有 if (pathname === ...) 逻辑都保持原样)
     // 获取活跃的、等待中的房间列表
     if (pathname === '/api/rooms' && request.method === 'GET') {
         const { results } = await env.DB.prepare(
@@ -150,38 +149,31 @@ async function handleApiRequest(request, env, auth) {
     return new Response(JSON.stringify({ error: 'Not Found' }), { status: 404, headers: responseHeaders });
 }
 
-
-// Cloudflare Pages 的新入口点 (已修改为新的验证方式)
+// Cloudflare Pages 的新入口点
 export const onRequest = async ({ request, env }) => {
     if (request.method === 'OPTIONS') {
         return new Response(null, { headers: corsHeaders });
     }
+
+    if (!env.CLERK_SECRET_KEY || !env.VITE_CLERK_PUBLISHABLE_KEY) {
+        return new Response(JSON.stringify({ error: "Server configuration error: Clerk keys are not set." }), { status: 500, headers: corsHeaders });
+    }
     
     const clerkClient = createClerkClient({ secretKey: env.CLERK_SECRET_KEY });
-    const authorizationHeader = request.headers.get('Authorization');
-
-    if (!authorizationHeader) {
-        return new Response(JSON.stringify({ error: 'Authorization header is missing' }), { status: 401, headers: corsHeaders });
-    }
-
-    const token = authorizationHeader.replace('Bearer ', '');
-
+    
     try {
-        const claims = await clerkClient.verifyToken(token);
-        if (!claims.sub) {
-            return new Response(JSON.stringify({ error: 'Invalid token claims' }), { status: 401, headers: corsHeaders });
-        }
-        
-        const user = await clerkClient.users.getUser(claims.sub);
-        if (!user) {
-            return new Response(JSON.stringify({ error: 'User not found' }), { status: 404, headers: corsHeaders });
-        }
+        const auth = await clerkClient.authenticateRequest({
+            request,
+            secretKey: env.CLERK_SECRET_KEY,
+            publishableKey: env.VITE_CLERK_PUBLISHABLE_KEY,
+            // 核心修复：在这里补上与前端一致的 domain 和 isSatellite 配置
+            domain: "100points.zhusuan.dpdns.org",
+            isSatellite: true,
+        });
 
-        const auth = {
-            isAuthenticated: true,
-            userId: user.id,
-            user: user,
-        };
+        if (!auth.isAuthenticated) {
+            return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: corsHeaders });
+        }
         
         return await handleApiRequest(request, env, auth);
 
@@ -189,3 +181,5 @@ export const onRequest = async ({ request, env }) => {
         return new Response(JSON.stringify({ error: "Authentication failed: " + e.message }), { status: 401, headers: corsHeaders });
     }
 };
+};
+
