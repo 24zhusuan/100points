@@ -7,7 +7,7 @@ import { Trophy, ArrowLeft, Swords } from "lucide-react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { createPageUrl } from "@/lib/utils";
 import { motion } from "framer-motion";
-import { useUser, useAuth } from "@clerk/clerk-react"; // 1. 导入 useAuth
+import { useUser } from "@clerk/clerk-react";
 
 const RoundHistory = ({ room, me, opponent }) => {
     if (room.current_round <= 1) return null;
@@ -43,7 +43,6 @@ const RoundHistory = ({ room, me, opponent }) => {
 export default function GameRoom() {
   const navigate = useNavigate();
   const { user, isLoaded } = useUser();
-  const { getToken } = useAuth(); // 2. 获取 getToken 函数
   const [room, setRoom] = useState(null);
   const [playerNumber, setPlayerNumber] = useState("");
   const [gamePhase, setGamePhase] = useState("loading"); // waiting, playing, round_complete, game_complete
@@ -56,10 +55,7 @@ export default function GameRoom() {
   const loadRoom = useCallback(async () => {
     if (!roomId) { setError("No room ID provided."); return; }
     try {
-      const token = await getToken(); // 3. 手动添加 Authorization header
-      const response = await fetch(`/api/room/${roomId}`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
+      const response = await fetch(`/api/room/${roomId}`);
       if (response.status === 404) throw new Error("Game room not found.");
       if (!response.ok) throw new Error("Could not load the game room.");
       let currentRoom = await response.json();
@@ -72,7 +68,7 @@ export default function GameRoom() {
     } finally {
       setIsLoading(false);
     }
-  }, [roomId, getToken]);
+  }, [roomId]);
 
   const me = useMemo(() => {
     if (!room || !user) return null;
@@ -109,13 +105,9 @@ export default function GameRoom() {
     }
     
     try {
-        const token = await getToken(); // 3. 手动添加 Authorization header
         const response = await fetch(`/api/room/${room.id}/submit`, {
             method: 'POST',
-            headers: { 
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${token}`
-            },
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ userId: user.id, number }),
         });
         const resData = await response.json();
@@ -134,18 +126,14 @@ export default function GameRoom() {
   const processRound = useCallback(async (currentRoom) => {
     if (!currentRoom) return;
     try {
-        const token = await getToken(); // 3. 手动添加 Authorization header
-        const response = await fetch(`/api/room/${currentRoom.id}/process-round`, { 
-            method: 'POST',
-            headers: { 'Authorization': `Bearer ${token}` }
-        });
+        const response = await fetch(`/api/room/${currentRoom.id}/process-round`, { method: 'POST' });
         if (!response.ok) return;
         const updatedRoom = await response.json();
         updatedRoom.player1_numbers = JSON.parse(updatedRoom.player1_numbers || '[]');
         updatedRoom.player2_numbers = JSON.parse(updatedRoom.player2_numbers || '[]');
         setRoom(updatedRoom);
     } catch (e) { console.error("Failed to process round", e); }
-  }, [getToken]);
+  }, []);
 
   useEffect(() => {
     if (isLoaded && user) {
@@ -175,7 +163,6 @@ export default function GameRoom() {
     }
   }, [room, me, processRound]);
 
-  // ... (剩余的 return 部分代码保持不变)
   if (isLoading || !isLoaded || !me || !opponent) {
     return (
       <div className="min-h-screen bg-slate-900 flex items-center justify-center">
