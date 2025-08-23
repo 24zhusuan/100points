@@ -7,7 +7,7 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'Content-Type, Authorization',
 };
 
-// 您的完整游戏逻辑 (这部分保持不变)
+// 您的完整游戏逻辑
 async function handleApiRequest(request, env, auth) {
     const { pathname } = new URL(request.url);
     const { userId, user } = auth; 
@@ -166,7 +166,6 @@ export const onRequest = async ({ request, env }) => {
             request,
             secretKey: env.CLERK_SECRET_KEY,
             publishableKey: env.VITE_CLERK_PUBLISHABLE_KEY,
-            // 核心修复：在这里补上与前端一致的 domain 和 isSatellite 配置
             domain: "100points.zhusuan.dpdns.org",
             isSatellite: true,
         });
@@ -180,6 +179,5 @@ export const onRequest = async ({ request, env }) => {
     } catch (e) {
         return new Response(JSON.stringify({ error: "Authentication failed: " + e.message }), { status: 401, headers: corsHeaders });
     }
-};
 };
 
