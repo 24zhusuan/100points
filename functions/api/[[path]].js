@@ -1,16 +1,15 @@
-import { createClerkClient } from "@clerk/backend";
+import { createClerkClient, clerkMiddleware } from "@clerk/backend";
 
-// CORS 预检请求的响应头
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-};
-
-// 您的完整游戏逻辑
-async function handleApiRequest(request, env, auth) {
+// 您的完整游戏逻辑，现在作为一个独立的函数
+const handleApiRequest = async ({ request, env, auth }) => {
     const { pathname } = new URL(request.url);
     const { userId, user } = auth; 
+
+    const corsHeaders = {
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+        'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+    };
 
     const responseHeaders = {
         ...corsHeaders,
@@ -149,34 +148,19 @@ async function handleApiRequest(request, env, auth) {
     return new Response(JSON.stringify({ error: 'Not Found' }), { status: 404, headers: responseHeaders });
 }
 
-// Cloudflare Pages 的新入口点
-export const onRequest = async ({ request, env }) => {
-    if (request.method === 'OPTIONS') {
-        return new Response(null, { headers: corsHeaders });
-    }
+// 使用 Clerk 中间件来包裹我们的游戏逻辑
+export const onRequest = clerkMiddleware((request, context) => {
+    // context.auth 中现在包含了验证过的用户信息
+    const auth = context.auth;
 
-    if (!env.CLERK_SECRET_KEY || !env.VITE_CLERK_PUBLISHABLE_KEY) {
-        return new Response(JSON.stringify({ error: "Server configuration error: Clerk keys are not set." }), { status: 500, headers: corsHeaders });
-    }
-    
-    const clerkClient = createClerkClient({ secretKey: env.CLERK_SECRET_KEY });
-    
-    try {
-        const auth = await clerkClient.authenticateRequest({
-            request,
-            secretKey: env.CLERK_SECRET_KEY,
-            publishableKey: env.VITE_CLERK_PUBLISHABLE_KEY,
-            domain: "100points.zhusuan.dpdns.org",
-            isSatellite: true,
+    // 如果用户未登录，Clerk 中间件会自动返回 401 或 403 错误
+    if (!auth.userId) {
+        return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+            status: 401,
+            headers: { 'Content-Type': 'application/json' },
         });
-
-        if (!auth.isAuthenticated) {
-            return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: corsHeaders });
-        }
-        
-        return await handleApiRequest(request, env, auth);
-
-    } catch (e) {
-        return new Response(JSON.stringify({ error: "Authentication failed: " + e.message }), { status: 401, headers: corsHeaders });
     }
-};
+    
+    // 如果用户已登录，则将请求和认证信息传递给我们的游戏逻辑
+    return handleApiRequest({ request, env: context.env, auth });
+});
