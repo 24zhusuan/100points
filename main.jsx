@@ -17,6 +17,8 @@ ReactDOM.createRoot(document.getElementById('root')).render(
       publishableKey={PUBLISHABLE_KEY}
       domain="100points.zhusuan.dpdns.org"
       isSatellite
+      // 如果这是一个卫星应用，请取消下面一行的注释，并填入您的主应用 URL
+      // proxyUrl="<YOUR_PRIMARY_APP_URL>"
     >
       <BrowserRouter>
         <App />
@@ -24,3 +26,4 @@ ReactDOM.createRoot(document.getElementById('root')).render(
     </ClerkProvider>
   </React.StrictMode>
 );
+
