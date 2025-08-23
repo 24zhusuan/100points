@@ -166,8 +166,6 @@ export const onRequest = async ({ request, env }) => {
             request,
             secretKey: env.CLERK_SECRET_KEY,
             publishableKey: env.VITE_CLERK_PUBLISHABLE_KEY,
-            domain: "100points.zhusuan.dpdns.org",
-            isSatellite: true,
         });
 
         if (!auth.isAuthenticated) {
