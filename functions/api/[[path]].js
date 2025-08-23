@@ -180,4 +180,3 @@ export const onRequest = async ({ request, env }) => {
         return new Response(JSON.stringify({ error: "Authentication failed: " + e.message }), { status: 401, headers: corsHeaders });
     }
 };
-
