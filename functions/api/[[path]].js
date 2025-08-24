@@ -7,7 +7,7 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'Content-Type, Authorization',
 };
 
-// 您的完整游戏逻辑 (这部分无需任何改动)
+// 您的完整游戏逻辑
 async function handleApiRequest(request, env, auth) {
     const { pathname } = new URL(request.url);
     const { userId, user } = auth; 
@@ -149,44 +149,34 @@ async function handleApiRequest(request, env, auth) {
     return new Response(JSON.stringify({ error: 'Not Found' }), { status: 404, headers: responseHeaders });
 }
 
-// Cloudflare Pages 的新入口点 (全新、更简洁的验证方式)
+// Cloudflare Pages 的新入口点
 export const onRequest = async ({ request, env }) => {
     if (request.method === 'OPTIONS') {
         return new Response(null, { headers: corsHeaders });
     }
-    
-    // 从请求头中提取令牌
-    const authorizationHeader = request.headers.get('Authorization');
-    if (!authorizationHeader) {
-        return new Response(JSON.stringify({ error: 'Authorization header is missing' }), { status: 401, headers: corsHeaders });
+
+    if (!env.CLERK_SECRET_KEY || !env.VITE_CLERK_PUBLISHABLE_KEY) {
+        return new Response(JSON.stringify({ error: "Server configuration error: Clerk keys are not set." }), { status: 500, headers: corsHeaders });
     }
-    const token = authorizationHeader.replace('Bearer ', '');
-
-    // 使用 Clerk SDK 验证令牌
+    
+    const clerkClient = createClerkClient({ secretKey: env.CLERK_SECRET_KEY });
+    
     try {
-        const clerkClient = createClerkClient({ secretKey: env.CLERK_SECRET_KEY });
-        const claims = await clerkClient.verifyToken(token);
-        
-        if (!claims || !claims.sub) {
-            return new Response(JSON.stringify({ error: 'Invalid token' }), { status: 401, headers: corsHeaders });
-        }
-        
-        // 获取完整的用户信息
-        const user = await clerkClient.users.getUser(claims.sub);
-        if (!user) {
-            return new Response(JSON.stringify({ error: 'User not found' }), { status: 404, headers: corsHeaders });
-        }
+        const auth = await clerkClient.authenticateRequest({
+            request,
+            secretKey: env.CLERK_SECRET_KEY,
+            publishableKey: env.VITE_CLERK_PUBLISHABLE_KEY,
+            domain: "100points.zhusuan.dpdns.org",
+            isSatellite: true,
+        });
 
-        // 构建 auth 对象，传递给游戏逻辑
-        const auth = {
-            userId: user.id,
-            user: user,
-        };
+        if (!auth.isAuthenticated) {
+            return new Response(JSON.stringify({ error: 'Unauthorized' }), { headers: corsHeaders });
+        }
         
         return await handleApiRequest(request, env, auth);
 
     } catch (e) {
-        // 如果令牌验证失败（例如过期、签名错误），返回 401
         return new Response(JSON.stringify({ error: "Authentication failed: " + e.message }), { status: 401, headers: corsHeaders });
     }
 };
