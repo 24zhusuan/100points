@@ -166,7 +166,7 @@ export const onRequest = async ({ request, env }) => {
             request,
             secretKey: env.CLERK_SECRET_KEY,
             publishableKey: env.VITE_CLERK_PUBLISHABLE_KEY,
-            domain: "100points.zhusuan.dpdns.org",
+            proxyUrl: "https://100points.clerk.accounts.dev", // ← 这里换成你 Clerk 分配的域名
             isSatellite: true,
         });
 
