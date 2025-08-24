@@ -96,10 +96,27 @@ export const onRequest = async ({ request, env }) => {
         const clerkClient = createClerkClient({ secretKey: env.CLERK_SECRET_KEY });
         const auth = await clerkClient.authenticateRequest({ request });
         if (!auth.isAuthenticated) {
-            return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: corsHeaders });
+            // 如果需要，可以在这里返回一个更详细的未授权信息
+            const unauthedResp = new Response(JSON.stringify({ error: 'Unauthorized' }), {
+                status: 401,
+                headers: responseHeaders,
+            });
+            // 附加 CORS 头
+            for (const [key, value] of Object.entries(corsHeaders)) {
+                unauthedResp.headers.set(key, value);
+            }
+            return unauthedResp;
         }
         return await handleApiRequest(request, env, auth);
     } catch (e) {
-        return new Response(JSON.stringify({ error: "Authentication failed: " + e.message }), { status: 500, headers: corsHeaders });
+        const errorResp = new Response(JSON.stringify({ error: "Authentication failed: " + e.message }), {
+            status: 500,
+            headers: responseHeaders,
+        });
+        // 附加 CORS 头
+        for (const [key, value] of Object.entries(corsHeaders)) {
+            errorResp.headers.set(key, value);
+        }
+        return errorResp;
     }
 };
