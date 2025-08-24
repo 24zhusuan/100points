@@ -7,7 +7,7 @@ import { Trophy, ArrowLeft, Swords } from "lucide-react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { createPageUrl } from "@/lib/utils";
 import { motion } from "framer-motion";
-import { useUser } from "@clerk/clerk-react";
+import { useUser, useAuth } from "@clerk/clerk-react";
 
 const RoundHistory = ({ room, me, opponent }) => {
     if (room.current_round <= 1) return null;
@@ -43,9 +43,10 @@ const RoundHistory = ({ room, me, opponent }) => {
 export default function GameRoom() {
   const navigate = useNavigate();
   const { user, isLoaded } = useUser();
+  const { getToken } = useAuth();
   const [room, setRoom] = useState(null);
   const [playerNumber, setPlayerNumber] = useState("");
-  const [gamePhase, setGamePhase] = useState("loading"); // waiting, playing, round_complete, game_complete
+  const [gamePhase, setGamePhase] = useState("loading");
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -53,9 +54,15 @@ export default function GameRoom() {
   const roomId = useMemo(() => new URLSearchParams(location.search).get('room'), [location.search]);
 
   const loadRoom = useCallback(async () => {
-    if (!roomId) { setError("No room ID provided."); return; }
+    if (!isLoaded || !user || !roomId) {
+        if(isLoaded && !user) navigate(createPageUrl("Dashboard"));
+        return; 
+    }
     try {
-      const response = await fetch(`/api/room/${roomId}`);
+      const token = await getToken();
+      const response = await fetch(`/api/room/${roomId}`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
       if (response.status === 404) throw new Error("Game room not found.");
       if (!response.ok) throw new Error("Could not load the game room.");
       let currentRoom = await response.json();
@@ -68,7 +75,15 @@ export default function GameRoom() {
     } finally {
       setIsLoading(false);
     }
-  }, [roomId]);
+  }, [roomId, getToken, isLoaded, user, navigate]);
+
+  useEffect(() => {
+    if (isLoaded) {
+      loadRoom();
+      const interval = setInterval(loadRoom, 3000);
+      return () => clearInterval(interval);
+    }
+  }, [isLoaded, loadRoom]);
 
   const me = useMemo(() => {
     if (!room || !user) return null;
@@ -105,9 +120,13 @@ export default function GameRoom() {
     }
     
     try {
+        const token = await getToken();
         const response = await fetch(`/api/room/${room.id}/submit`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
             body: JSON.stringify({ userId: user.id, number }),
         });
         const resData = await response.json();
@@ -126,23 +145,18 @@ export default function GameRoom() {
   const processRound = useCallback(async (currentRoom) => {
     if (!currentRoom) return;
     try {
-        const response = await fetch(`/api/room/${currentRoom.id}/process-round`, { method: 'POST' });
+        const token = await getToken();
+        const response = await fetch(`/api/room/${currentRoom.id}/process-round`, { 
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
         if (!response.ok) return;
         const updatedRoom = await response.json();
         updatedRoom.player1_numbers = JSON.parse(updatedRoom.player1_numbers || '[]');
         updatedRoom.player2_numbers = JSON.parse(updatedRoom.player2_numbers || '[]');
         setRoom(updatedRoom);
     } catch (e) { console.error("Failed to process round", e); }
-  }, []);
-
-  useEffect(() => {
-    if (isLoaded && user) {
-        loadRoom();
-        const interval = setInterval(loadRoom, 3000);
-        return () => clearInterval(interval);
-    }
-    if (isLoaded && !user) { navigate(createPageUrl("Dashboard")); }
-  }, [isLoaded, user, loadRoom, navigate]);
+  }, [getToken]);
   
   useEffect(() => {
     if (!room || !me) return;
@@ -163,7 +177,7 @@ export default function GameRoom() {
     }
   }, [room, me, processRound]);
 
-  if (isLoading || !isLoaded || !me || !opponent) {
+  if (isLoading || !isLoaded || !room || !me || !opponent) {
     return (
       <div className="min-h-screen bg-slate-900 flex items-center justify-center">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
@@ -171,11 +185,11 @@ export default function GameRoom() {
     );
   }
 
-  if (error || !room) {
+  if (error) {
     return (
       <div className="min-h-screen bg-slate-900 p-6 flex items-center justify-center">
         <div className="text-center">
-          <h1 className="text-2xl font-bold text-slate-100 mb-4">{error || "Room not found."}</h1>
+          <h1 className="text-2xl font-bold text-slate-100 mb-4">{error}</h1>
           <Button onClick={() => navigate(createPageUrl("Dashboard"))}><ArrowLeft className="w-4 h-4 mr-2" />Return to Dashboard</Button>
         </div>
       </div>
