@@ -162,23 +162,21 @@ export const onRequest = async ({ request, env }) => {
     const clerkClient = createClerkClient({ secretKey: env.CLERK_SECRET_KEY });
     
     try {
-        const standardRequest = new Request(request.url, request);
-
         const auth = await clerkClient.authenticateRequest({
-            request: standardRequest,
+            request,
             secretKey: env.CLERK_SECRET_KEY,
             publishableKey: env.VITE_CLERK_PUBLISHABLE_KEY,
-            domain: "100points.zhusuan.dpdns.org", // 明确告知后端这是哪个卫星应用
+            domain: "100points.zhusuan.dpdns.org",
             isSatellite: true,
         });
 
         if (!auth.isAuthenticated) {
-            return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: corsHeaders });
+            return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: responseHeaders });
         }
         
         return await handleApiRequest(request, env, auth);
 
     } catch (e) {
-        return new Response(JSON.stringify({ error: "Authentication failed: " + e.message }), { status: 401, headers: corsHeaders });
+        return new Response(JSON.stringify({ error: "Authentication failed: " + e.message }), { status: 401, headers: responseHeaders });
     }
 };
