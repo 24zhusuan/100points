@@ -6,7 +6,7 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'Content-Type, Authorization',
 };
 
-// 业务逻辑处理函数 (已验证是正确的)
+// 业务逻辑处理函数 (这部分没有问题，保持不变)
 async function handleApiRequest(request, env, auth) {
     const { pathname } = new URL(request.url);
     const { userId, user } = auth;
@@ -103,20 +103,39 @@ export const onRequest = async ({ request, env }) => {
     }
 
     try {
-        // 使用最标准、最简单的方式初始化
         const clerkClient = createClerkClient({ secretKey: env.CLERK_SECRET_KEY });
 
-        const auth = await clerkClient.authenticateRequest({ request });
-        if (!auth.isAuthenticated) {
-            return new Response(JSON.stringify({ error: 'Unauthorized' }), {
-                status: 401,
-                headers: responseHeaders,
-            });
+        // --- 手动验证流程 ---
+        const authHeader = request.headers.get('Authorization');
+        if (!authHeader) {
+            return new Response(JSON.stringify({ error: 'Authorization header is missing.' }), { status: 401, headers: responseHeaders });
         }
+        
+        const token = authHeader.split(' ')[1];
+        if (!token) {
+            return new Response(JSON.stringify({ error: 'Bearer token is missing.' }), { status: 401, headers: responseHeaders });
+        }
+
+        // 验证Token
+        const claims = await clerkClient.verifyToken(token);
+        if (!claims || !claims.sub) {
+            return new Response(JSON.stringify({ error: 'Invalid token.' }), { status: 401, headers: responseHeaders });
+        }
+        
+        // Token有效，手动获取用户信息
+        const userId = claims.sub;
+        const user = await clerkClient.users.getUser(userId);
+
+        // 构建auth对象，传递给业务逻辑
+        const auth = { isAuthenticated: true, userId, user };
+        
         return await handleApiRequest(request, env, auth);
+
     } catch (e) {
+        // 如果verifyToken或getUser失败，会在这里捕获
+        console.error("Authentication process failed:", e);
         return new Response(JSON.stringify({ error: "Authentication failed: " + e.message }), {
-            status: 500,
+            status: 401, // 返回401表示认证失败，而不是500服务器内部错误
             headers: responseHeaders,
         });
     }
