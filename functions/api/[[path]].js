@@ -6,6 +6,7 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'Content-Type, Authorization',
 };
 
+// handleApiRequest 函数保持不变 (此处省略以保持清晰)
 async function handleApiRequest(request, env, auth) {
     const { pathname } = new URL(request.url);
     const { userId, user } = auth;
@@ -16,7 +17,6 @@ async function handleApiRequest(request, env, auth) {
             const { results } = await env.DB.prepare("SELECT * FROM GameRooms WHERE status = 'waiting' ORDER BY created_date DESC LIMIT 20").all();
             return new Response(JSON.stringify(results || []), { headers: responseHeaders });
         }
-
         if (pathname.startsWith('/api/room/') && !pathname.includes('/submit') && !pathname.includes('/process-round') && request.method === 'GET') {
             const id = pathname.split('/')[3];
             if (!id) return new Response(JSON.stringify({ error: 'Room ID is required' }), { status: 400, headers: responseHeaders });
@@ -24,7 +24,6 @@ async function handleApiRequest(request, env, auth) {
             if (!room) return new Response(JSON.stringify({ error: 'Room not found' }), { status: 404, headers: responseHeaders });
             return new Response(JSON.stringify(room), { headers: responseHeaders });
         }
-
         if (pathname === '/api/rooms' && request.method === 'POST') {
             const body = await request.json();
             const newRoomId = crypto.randomUUID();
@@ -32,7 +31,6 @@ async function handleApiRequest(request, env, auth) {
             const newRoom = await env.DB.prepare('SELECT * FROM GameRooms WHERE id = ?').bind(newRoomId).first();
             return new Response(JSON.stringify(newRoom), { status: 201, headers: responseHeaders });
         }
-
         if (pathname === '/api/join-by-code' && request.method === 'POST') {
             const { room_code } = await request.json();
             const room = await env.DB.prepare("SELECT * FROM GameRooms WHERE room_code = ? AND status = 'waiting'").bind(room_code.toUpperCase()).first();
@@ -42,7 +40,6 @@ async function handleApiRequest(request, env, auth) {
             const updatedRoom = await env.DB.prepare('SELECT * FROM GameRooms WHERE id = ?').bind(room.id).first();
             return new Response(JSON.stringify(updatedRoom), { headers: responseHeaders });
         }
-        
         const submitMatch = pathname.match(/^\/api\/room\/([a-zA-Z0-9-]+)\/submit$/);
         if (submitMatch && request.method === 'POST') {
             const id = submitMatch[1];
@@ -60,7 +57,6 @@ async function handleApiRequest(request, env, auth) {
             const updatedRoom = await env.DB.prepare('SELECT * FROM GameRooms WHERE id = ?').bind(id).first();
             return new Response(JSON.stringify(updatedRoom), { headers: responseHeaders });
         }
-        
         const processMatch = pathname.match(/^\/api\/room\/([a-zA-Z0-9-]+)\/process-round$/);
         if (processMatch && request.method === 'POST') {
             const id = processMatch[1];
@@ -91,9 +87,7 @@ async function handleApiRequest(request, env, auth) {
             const finalRoomState = await env.DB.prepare('SELECT * FROM GameRooms WHERE id = ?').bind(id).first();
             return new Response(JSON.stringify(finalRoomState), { headers: responseHeaders });
         }
-
         return new Response(JSON.stringify({ error: 'Not Found' }), { status: 404, headers: responseHeaders });
-
     } catch (e) {
         console.error("Database or logic error:", e);
         return new Response(JSON.stringify({ error: "An internal server error occurred.", details: e.message }), { status: 500, headers: responseHeaders });
@@ -107,6 +101,18 @@ export const onRequest = async ({ request, env }) => {
         return new Response(null, { headers: corsHeaders });
     }
     
+    // --- 新增的调试代码 ---
+    // 明确检查CLERK_SECRET_KEY是否存在
+    if (!env.CLERK_SECRET_KEY || env.CLERK_SECRET_KEY.trim() === "") {
+        return new Response(JSON.stringify({
+            error: "Server configuration error: CLERK_SECRET_KEY is not available in the environment. Please check your Cloudflare Pages project settings for BOTH Production and Preview environments and redeploy."
+        }), {
+            status: 500,
+            headers: responseHeaders,
+        });
+    }
+    // --- 调试代码结束 ---
+
     if (!env.DB) {
       return new Response(JSON.stringify({ error: 'Database binding not found. Please configure D1 database binding in Cloudflare settings.' }), {
         status: 500,
