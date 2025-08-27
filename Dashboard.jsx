@@ -9,11 +9,14 @@ import { Plus, Users, Gamepad2, Search, Trophy } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { createPageUrl } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
-import { useUser, SignInButton, SignedIn, SignedOut } from "@clerk/clerk-react";
+// 引入 useAuth hook
+import { useUser, useAuth, SignInButton, SignedIn, SignedOut } from "@clerk/clerk-react";
 
 export default function Dashboard() {
   const navigate = useNavigate();
   const { user, isLoaded } = useUser();
+  // 使用 useAuth hook 获取 getToken 方法
+  const { getToken } = useAuth();
   const [rooms, setRooms] = useState([]);
   const [showCreateRoom, setShowCreateRoom] = useState(false);
   const [roomName, setRoomName] = useState("");
@@ -21,16 +24,20 @@ export default function Dashboard() {
   const [joinCode, setJoinCode] = useState("");
   const [isLoading, setIsLoading] = useState(true);
 
+  // 在 loadRooms 中添加认证头
   const loadRooms = useCallback(async () => {
     try {
-      const response = await fetch('/api/rooms');
+      const token = await getToken();
+      const response = await fetch('/api/rooms', {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
       if (!response.ok) throw new Error("Failed to load rooms");
       const activeRooms = await response.json();
       setRooms(activeRooms);
     } catch (error) {
       console.error("Failed to load rooms:", error);
     }
-  }, []);
+  }, [getToken]);
 
   useEffect(() => {
     if (isLoaded) {
@@ -41,19 +48,23 @@ export default function Dashboard() {
     }
   }, [isLoaded, user, loadRooms]);
 
+  // 在 createRoom 中添加认证头
   const createRoom = async () => {
     if (!roomName.trim() || !user) return;
     try {
+      const token = await getToken();
       const roomCode = Math.random().toString(36).substring(2, 8).toUpperCase();
       const response = await fetch('/api/rooms', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
         body: JSON.stringify({
           room_name: roomName,
           room_code: roomCode,
-          rounds: parseInt(rounds),
-          player1_id: user.id,
-          player1_full_name: user.fullName
+          rounds: parseInt(rounds)
+          // player1_id 和 player1_full_name 将在后端从认证信息中获取，无需前端传递
         }),
       });
       if (!response.ok) throw new Error('Failed to create room');
@@ -64,6 +75,7 @@ export default function Dashboard() {
     }
   };
 
+  // 在 handleJoinRoom 中添加认证头
   const handleJoinRoom = async (room) => {
     if (!user) return;
     if (room.player1_id === user.id || room.player2_id) {
@@ -71,13 +83,14 @@ export default function Dashboard() {
         return;
     }
     try {
+        const token = await getToken();
         const response = await fetch('/api/join-by-code', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                room_code: room.room_code,
-                user: { id: user.id, full_name: user.fullName }
-            }),
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({ room_code: room.room_code }),
         });
         if (!response.ok) throw new Error('Failed to join room');
         const joinedRoom = await response.json();
@@ -87,16 +100,18 @@ export default function Dashboard() {
     }
   }
 
+  // 在 joinByCode 中添加认证头
   const joinByCode = async () => {
     if (!joinCode.trim() || !user) return;
     try {
+      const token = await getToken();
       const response = await fetch('/api/join-by-code', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          room_code: joinCode,
-          user: { id: user.id, full_name: user.fullName }
-        }),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ room_code: joinCode }),
       });
       if (!response.ok) {
         const err = await response.json();
@@ -110,6 +125,7 @@ export default function Dashboard() {
     }
   };
 
+  // ... 剩余的 return 部分保持不变 ...
   if (!isLoaded || isLoading) {
     return (
         <div className="min-h-screen flex items-center justify-center bg-slate-900 p-6">
