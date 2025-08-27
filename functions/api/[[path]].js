@@ -6,7 +6,7 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'Content-Type, Authorization',
 };
 
-// handleApiRequest 函数保持不变 (此处省略以保持清晰)
+// handleApiRequest 函数保持不变
 async function handleApiRequest(request, env, auth) {
     const { pathname } = new URL(request.url);
     const { userId, user } = auth;
@@ -94,34 +94,32 @@ async function handleApiRequest(request, env, auth) {
     }
 }
 
+
 export const onRequest = async ({ request, env }) => {
     const responseHeaders = { ...corsHeaders, 'Content-Type': 'application/json' };
 
     if (request.method === 'OPTIONS') {
         return new Response(null, { headers: corsHeaders });
     }
-    
-    // --- 新增的调试代码 ---
-    // 明确检查CLERK_SECRET_KEY是否存在
-    if (!env.CLERK_SECRET_KEY || env.CLERK_SECRET_KEY.trim() === "") {
-        return new Response(JSON.stringify({
-            error: "Server configuration error: CLERK_SECRET_KEY is not available in the environment. Please check your Cloudflare Pages project settings for BOTH Production and Preview environments and redeploy."
-        }), {
-            status: 500,
-            headers: responseHeaders,
-        });
-    }
-    // --- 调试代码结束 ---
 
+    // 检查所有必需的环境变量
+    if (!env.CLERK_SECRET_KEY) {
+        return new Response(JSON.stringify({ error: "Server config error: CLERK_SECRET_KEY is not set." }), { status: 500, headers: responseHeaders });
+    }
+    if (!env.CLERK_ISSUER_URL) {
+        return new Response(JSON.stringify({ error: "Server config error: CLERK_ISSUER_URL is not set." }), { status: 500, headers: responseHeaders });
+    }
     if (!env.DB) {
-      return new Response(JSON.stringify({ error: 'Database binding not found. Please configure D1 database binding in Cloudflare settings.' }), {
-        status: 500,
-        headers: responseHeaders,
-      });
+      return new Response(JSON.stringify({ error: 'Server config error: D1 database binding not found.' }), { status: 500, headers: responseHeaders });
     }
 
     try {
-        const clerkClient = createClerkClient({ secretKey: env.CLERK_SECRET_KEY });
+        // 最终的、最明确的初始化方式
+        const clerkClient = createClerkClient({
+            secretKey: env.CLERK_SECRET_KEY,
+            issuer: env.CLERK_ISSUER_URL 
+        });
+
         const auth = await clerkClient.authenticateRequest({ request });
         if (!auth.isAuthenticated) {
             return new Response(JSON.stringify({ error: 'Unauthorized' }), {
@@ -131,7 +129,7 @@ export const onRequest = async ({ request, env }) => {
         }
         return await handleApiRequest(request, env, auth);
     } catch (e) {
-        return new Response(JSON.stringify({ error: "Authentication failed: " + e.message }), {
+        return new Response(JSON.stringify({ error: "Authentication failed: " + e.message, details: "Please verify CLERK_SECRET_KEY and CLERK_ISSUER_URL environment variables." }), {
             status: 500,
             headers: responseHeaders,
         });
